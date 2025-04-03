@@ -1,0 +1,90 @@
+<!DOCTYPE html><html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Torrent Streamer</title>
+    <script src="https://cdn.jsdelivr.net/npm/webtorrent/webtorrent.min.js"></script>
+    <style>
+        body { font-family: Arial, sans-serif; background: #f0f0f0; padding: 20px; }
+        #player { margin-top: 20px; }
+        video, audio { width: 100%; max-width: 600px; margin-bottom: 10px; }
+        select, input, button { padding: 10px; margin-right: 10px; }
+        #controls { margin-top: 10px; }
+        #volume, #playbackRate { width: 150px; }
+    </style>
+</head>
+<body>
+    <h1>Torrent Streamer</h1>
+    <input type="text" id="magnet" placeholder="Enter Magnet Link or Torrent File">
+    <button onclick="startTorrent()">Stream</button>
+    <select id="fileSelector" onchange="playSelectedFile()" style="display: none;"></select>
+    <div id="player"></div>
+    <div id="controls" style="display: none;">
+        <button onclick="playMedia()">Play</button>
+        <button onclick="pauseMedia()">Pause</button>
+        <button onclick="downloadFile()">Download</button>
+        <label>Volume: <input type="range" id="volume" min="0" max="1" step="0.1" value="1" onchange="changeVolume()"></label>
+        <label>Speed: <input type="range" id="playbackRate" min="0.5" max="2" step="0.1" value="1" onchange="changePlaybackRate()"></label>
+        <input type="range" id="progress" value="0" max="100" style="width: 300px;">
+    </div><script>
+    const client = new WebTorrent();
+    let currentTorrent;
+    let currentMedia;
+
+    function startTorrent() {
+        const magnetLink = document.getElementById('magnet').value;
+        if (!magnetLink) return alert('Please enter a valid magnet link.');
+
+        client.add(magnetLink, torrent => {
+            currentTorrent = torrent;
+            const selector = document.getElementById('fileSelector');
+            selector.innerHTML = '';
+            torrent.files.forEach((file, index) => {
+                if (file.name.endsWith('.mp4') || file.name.endsWith('.mp3')) {
+                    const option = document.createElement('option');
+                    option.value = index;
+                    option.text = file.name;
+                    selector.appendChild(option);
+                }
+            });
+            selector.style.display = 'inline';
+            document.getElementById('controls').style.display = 'block';
+            playSelectedFile();
+        });
+    }
+
+    function playSelectedFile() {
+        const selector = document.getElementById('fileSelector');
+        const file = currentTorrent.files[selector.value];
+        document.getElementById('player').innerHTML = '';
+        file.appendTo('#player', { autoplay: true }, element => {
+            currentMedia = element;
+            element.addEventListener('timeupdate', updateProgress);
+            changeVolume();
+            changePlaybackRate();
+        });
+    }
+
+    function playMedia() { currentMedia.play(); }
+    function pauseMedia() { currentMedia.pause(); }
+    function changeVolume() { currentMedia.volume = document.getElementById('volume').value; }
+    function changePlaybackRate() { currentMedia.playbackRate = document.getElementById('playbackRate').value; }
+
+    function updateProgress() {
+        const progress = document.getElementById('progress');
+        progress.value = (currentMedia.currentTime / currentMedia.duration) * 100;
+    }
+
+    function downloadFile() {
+        currentTorrent.files[document.getElementById('fileSelector').value].getBlob((err, blob) => {
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = currentMedia.src.split('/').pop();
+            a.click();
+        });
+    }
+</script>
+
+</body>
+</html>
